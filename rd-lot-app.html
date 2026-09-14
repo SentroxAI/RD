@@ -740,6 +740,25 @@ function parseDenomination(words){
   return Number.isFinite(amount) && amount > 0 ? amount : "";
 }
 
+function prepareOcrUpload(file){
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      const maxDimension = 2200;
+      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => blob ? resolve(new File([blob], "rd-account.jpg", {type: "image/jpeg"})) : reject(new Error("Image preparation failed.")), "image/jpeg", .86);
+    };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image could not be loaded.")); };
+    image.src = url;
+  });
+}
+
 function parseOcrTable(tsv, structuredWords=[]){
   if (!tsv && !structuredWords.length) return [];
   const words = [];
@@ -931,7 +950,9 @@ function setupMemberForm(){
     status.textContent = "Uploading image securely...";
     try{
       const body = new FormData();
-      body.append("image", image);
+      status.textContent = "Preparing image...";
+      const preparedImage = await prepareOcrUpload(image);
+      body.append("image", preparedImage);
       const session = cloudMode ? (await supabaseClient.auth.getSession()).data.session : null;
       const headers = session?.access_token ? {Authorization: `Bearer ${session.access_token}`} : {};
       status.textContent = "Reading image on the server...";

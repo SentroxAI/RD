@@ -33,7 +33,9 @@ export default async function handler(req, res){
     await runMiddleware(req, res, upload.single("image"));
     if (!req.file) return res.status(400).json({error: "An image is required."});
     const worker = await getWorker();
-    const {data} = await worker.recognize(req.file.buffer);
+    const recognition = worker.recognize(req.file.buffer);
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("OCR timed out")), 50000));
+    const {data} = await Promise.race([recognition, timeout]);
     const words = (data.words || []).map(word => ({
       block: word.block,
       paragraph: word.paragraph,
