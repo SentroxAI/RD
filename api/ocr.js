@@ -24,7 +24,8 @@ export default async function handler(req, res){
   if (req.method !== "POST") return res.status(405).json({error: "Method not allowed."});
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "");
   if (process.env.OCR_ALLOW_ANONYMOUS !== "true") {
-    if (!supabase || !token) return res.status(401).json({error: "Sign in before using OCR."});
+    if (!supabase) return res.status(500).json({error: "OCR backend is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY in Vercel, then redeploy."});
+    if (!token) return res.status(401).json({error: "Sign in before using OCR."});
     const {data, error} = await supabase.auth.getUser(token);
     if (error || !data.user) return res.status(401).json({error: "Your session has expired. Sign in again."});
   }

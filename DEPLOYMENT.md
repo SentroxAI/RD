@@ -78,6 +78,8 @@ SUPABASE_ANON_KEY=your-publishable-or-anon-key
 OCR_ALLOW_ANONYMOUS=false
 ```
 
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` are required by `/api/ocr` to verify the signed-in user. The frontend can still log in without them because it has its own public config, but OCR will return a configuration error. After adding or changing these variables, use **Deployments > Redeploy** and select **Use existing Build Cache** off if the old function persists.
+
 4. Click **Deploy**.
 5. In Supabase, open **Authentication > URL Configuration** and set the Vercel URL as the Site URL, for example `https://rd-lot-register.vercel.app`.
 6. Add the same URL to the allowed redirect URLs if email confirmation is enabled.
