@@ -1,0 +1,56 @@
+import multer from "multer";
+import {createWorker} from "tesseract.js";
+import {createClient} from "@supabase/supabase-js";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {fileSize: 10 * 1024 * 1024}
+});
+const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
+  : null;
+let workerPromise;
+
+function runMiddleware(req, res, middleware){
+  return new Promise((resolve, reject) => middleware(req, res, error => error ? reject(error) : resolve()));
+}
+
+async function getWorker(){
+  if (!workerPromise) workerPromise = createWorker("eng");
+  return workerPromise;
+}
+
+export default async function handler(req, res){
+  if (req.method !== "POST") return res.status(405).json({error: "Method not allowed."});
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+  if (process.env.OCR_ALLOW_ANONYMOUS !== "true") {
+    if (!supabase || !token) return res.status(401).json({error: "Sign in before using OCR."});
+    const {data, error} = await supabase.auth.getUser(token);
+    if (error || !data.user) return res.status(401).json({error: "Your session has expired. Sign in again."});
+  }
+  try{
+    await runMiddleware(req, res, upload.single("image"));
+    if (!req.file) return res.status(400).json({error: "An image is required."});
+    const worker = await getWorker();
+    const {data} = await worker.recognize(req.file.buffer);
+    const words = (data.words || []).map(word => ({
+      block: word.block,
+      paragraph: word.paragraph,
+      line: word.line,
+      text: word.text,
+      confidence: word.confidence,
+      left: word.bbox?.x0,
+      top: word.bbox?.y0,
+      width: word.bbox ? word.bbox.x1 - word.bbox.x0 : 0,
+      height: word.bbox ? word.bbox.y1 - word.bbox.y0 : 0
+    }));
+    return res.json({text: data.text, tsv: data.tsv || "", words});
+  }catch(error){
+    console.error("OCR failed", error);
+    return res.status(500).json({error: "OCR failed on the server."});
+  }
+}
+
+export const config = {
+  api: {bodyParser: false}
+};
