@@ -14,6 +14,7 @@ function runMiddleware(req, res, middleware){
 
 export default async function handler(req, res){
   if (req.method !== "POST") return res.status(405).json({error: "Method not allowed."});
+  if (!process.env.OCR_SPACE_API_KEY) return res.status(500).json({error: "OCR provider is not configured. Add OCR_SPACE_API_KEY in Vercel and redeploy."});
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "");
   if (process.env.OCR_ALLOW_ANONYMOUS !== "true") {
     if (!supabase) return res.status(500).json({error: "OCR backend is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY in Vercel, then redeploy."});
@@ -33,7 +34,8 @@ export default async function handler(req, res){
     const response = await fetch("https://api.ocr.space/parse/image", {method: "POST", body: form});
     const result = await response.json();
     if (!response.ok || result.IsErroredOnProcessing) {
-      return res.status(502).json({error: result.ErrorMessage?.join?.(" ") || "Hosted OCR provider failed."});
+      const providerError = Array.isArray(result.ErrorMessage) ? result.ErrorMessage.join(" ") : result.ErrorMessage;
+      return res.status(502).json({error: providerError || result.ErrorDetails || "Hosted OCR provider rejected the image."});
     }
     const text = (result.ParsedResults || []).map(item => item.ParsedText || "").join("\n");
     return res.json({text, tsv: "", words: []});
