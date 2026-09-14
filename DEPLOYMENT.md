@@ -58,6 +58,7 @@ Set these values in `.env`:
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-publishable-or-anon-key
 OCR_ALLOW_ANONYMOUS=false
+OCR_SPACE_API_KEY=your-ocr-space-api-key
 ```
 
 Open `http://localhost:3000`. The Node service serves the app and the `/api/ocr` endpoint together. In production, deploy `server.js` to a Node host such as Render, Railway, Fly.io, or a VPS. Set `ocrUrl` in `supabase-config.js` to that service URL plus `/api/ocr` if the frontend is hosted separately.
@@ -78,7 +79,7 @@ SUPABASE_ANON_KEY=your-publishable-or-anon-key
 OCR_ALLOW_ANONYMOUS=false
 ```
 
-`SUPABASE_URL` and `SUPABASE_ANON_KEY` are required by `/api/ocr` to verify the signed-in user. The frontend can still log in without them because it has its own public config, but OCR will return a configuration error. After adding or changing these variables, use **Deployments > Redeploy** and select **Use existing Build Cache** off if the old function persists.
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` verify the signed-in user. `OCR_SPACE_API_KEY` is the hosted OCR provider key; create one at https://ocr.space/ocrapi and add it to Vercel. After adding or changing variables, use **Deployments > Redeploy**.
 
 4. Click **Deploy**.
 5. In Supabase, open **Authentication > URL Configuration** and set the Vercel URL as the Site URL, for example `https://rd-lot-register.vercel.app`.
