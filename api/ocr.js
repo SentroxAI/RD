@@ -1,6 +1,10 @@
 import multer from "multer";
 import {createWorker} from "tesseract.js";
 import {createClient} from "@supabase/supabase-js";
+import path from "node:path";
+import {fileURLToPath} from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -16,7 +20,7 @@ function runMiddleware(req, res, middleware){
 }
 
 async function getWorker(){
-  if (!workerPromise) workerPromise = createWorker("eng");
+  if (!workerPromise) workerPromise = createWorker("eng", 1, {langPath: path.join(__dirname, ".."), gzip: false});
   return workerPromise;
 }
 
