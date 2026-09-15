@@ -146,6 +146,9 @@
   .member-acc{font-size:10.5px; color:var(--ink-soft); font-variant-numeric:tabular-nums; margin-top:1px;}
   .member-amt{font-size:14px; font-weight:700; color:var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums;}
   .member-amt small{display:block; font-size:9.5px; font-weight:400; color:var(--ink-soft); text-align:right;}
+  .member-delete{width:32px; height:32px; margin-left:6px; border:1px solid var(--hair); border-radius:4px; background:var(--paper); color:var(--pending); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; vertical-align:top;}
+  .member-delete:hover{background:var(--pending-soft);}
+  .member-delete svg{width:16px; height:16px;}
 
   .months{display:grid; grid-template-columns:repeat(12,minmax(28px,1fr)); gap:6px;}
   .m-chip{
@@ -605,6 +608,27 @@ async function savePayment(accountNo, year, month, paid){
   if (error) window.alert("Payment could not be saved online.");
 }
 
+async function deleteMember(member){
+  if (!window.confirm(`Delete ${member.name} (${member.acc}) and all of its payment records?`)) return;
+  if (cloudMode) {
+    const memberId = cloudMemberIds[member.acc];
+    const {error} = await supabaseClient.from("members").delete().eq("id", memberId);
+    if (error) {
+      window.alert("Member could not be deleted online.");
+      return;
+    }
+    delete cloudMemberIds[member.acc];
+  }
+  const index = MEMBERS.findIndex(item => item.acc === member.acc);
+  if (index >= 0) MEMBERS.splice(index, 1);
+  delete ticks[member.acc];
+  await saveMembers();
+  await saveTicks();
+  populateCalcMemberSelect();
+  renderMembers(document.getElementById("search").value);
+  renderStats();
+}
+
 /* ---------------------------------------------------------------------
    TRACKER RENDER
 --------------------------------------------------------------------- */
@@ -636,9 +660,15 @@ function renderMembers(filter=""){
         <div class="member-acc">A/C ${m.acc}</div>
         ${m.details ? `<div class="member-acc-detail">${m.details}</div>` : ""}
       </div>
-      <div class="member-amt">${fmtMoney(m.amt)}<small>/month</small></div>
+      <div>
+        <button class="member-delete" type="button" aria-label="Delete ${m.name}" title="Delete member">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+        </button>
+        <span class="member-amt">${fmtMoney(m.amt)}<small>/month</small></span>
+      </div>
     `;
     card.appendChild(head);
+    head.querySelector(".member-delete").addEventListener("click", () => deleteMember(m));
 
     const grid = document.createElement("div");
     grid.className = "months";
