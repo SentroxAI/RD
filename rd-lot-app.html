@@ -6,6 +6,7 @@
 <title>RD Lot Register — Mamta Uniyal</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --paper:#EDE6D3;
@@ -269,10 +270,10 @@
         <button class="icon-btn" id="export-csv" type="button" aria-label="Export spreadsheet CSV" title="Export CSV">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4h16v16H4zM4 9h16M9 4v16M14 9v11"/></svg>
         </button>
-        <button class="icon-btn" id="import-data" type="button" aria-label="Import payment backup" title="Import backup">
+        <button class="icon-btn" id="import-data" type="button" aria-label="Import JSON, CSV, or Excel data" title="Import JSON, CSV, or Excel">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 15V3M7 10l5 5 5-5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
         </button>
-        <input id="backup-file" type="file" accept=".json,.csv,application/json,text/csv" hidden>
+        <input id="backup-file" type="file" accept=".json,.csv,.xls,.xlsx,application/json,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
       </div>
     </div>
   </header>
@@ -1246,6 +1247,44 @@ function setupBackup(){
     const file = fileInput.files[0];
     if (!file) return;
     try{
+      const isExcel = /\.(xls|xlsx)$/i.test(file.name) || /spreadsheet|excel/.test(file.type);
+      if (isExcel) {
+        if (!window.XLSX) throw new Error("Excel reader is unavailable");
+        const workbook = XLSX.read(await file.arrayBuffer(), {type: "array", cellDates: false});
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, raw: false, defval: ""});
+        const normalizeHeader = value => String(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+        const headerIndex = rows.findIndex(row => {
+          const headers = row.map(normalizeHeader);
+          return headers.some(value => /accountno|accountnumber|acno/.test(value)) &&
+            headers.some(value => /accountname|membername/.test(value)) &&
+            headers.some(value => value === "denomination");
+        });
+        if (headerIndex < 0) throw new Error("Excel headers Account No., Account Name, and Denomination were not found");
+        const headers = rows[headerIndex].map(normalizeHeader);
+        const accountIndex = headers.findIndex(value => /accountno|accountnumber|acno/.test(value));
+        const nameIndex = headers.findIndex(value => /accountname|membername/.test(value));
+        const amountIndex = headers.findIndex(value => value === "denomination");
+        const imported = rows.slice(headerIndex + 1).map(row => {
+          const acc = String(row[accountIndex] || "").replace(/\.0$/, "").replace(/\s+/g, "").trim();
+          const name = String(row[nameIndex] || "").trim().toUpperCase();
+          const amountText = String(row[amountIndex] || "").replace(/,/g, "");
+          const amountMatch = amountText.match(/\d+(?:\.\d+)?/);
+          const amt = amountMatch ? Number(amountMatch[0]) : 0;
+          return {acc, name, amt, details: ""};
+        }).filter(member => /^\d{8,20}$/.test(member.acc) && member.name && member.amt > 0);
+        if (!imported.length) throw new Error("Excel contains no valid member rows");
+        imported.forEach(member => {
+          const existing = MEMBERS.findIndex(item => item.acc === member.acc);
+          if (existing >= 0) MEMBERS[existing] = member; else MEMBERS.push(member);
+        });
+        await saveMembers();
+        populateCalcMemberSelect();
+        renderMembers(document.getElementById("search").value);
+        renderStats();
+        window.alert(`${imported.length} member(s) imported from Excel.`);
+        return;
+      }
       const text = await file.text();
       if (file.name.toLowerCase().endsWith(".csv") || file.type === "text/csv") {
         const lines = text.split(/\r?\n/).filter(Boolean).map(line => line.match(/(?:^|,)\s*("(?:[^"]|"")*"|[^,]*)/g)?.map(cell => cell.replace(/^,/, "").trim().replace(/^"|"$/g, "").replace(/""/g, '"')) || []);

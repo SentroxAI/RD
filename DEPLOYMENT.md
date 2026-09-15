@@ -87,6 +87,8 @@ OCR_ALLOW_ANONYMOUS=false
 
 The frontend automatically calls the deployed same-origin `/api/ocr` endpoint because `ocrUrl` is empty. Do not add a service-role key to Vercel or `supabase-config.js`.
 
+The top-right import button also accepts the India Post agent portal `.xls` export. It finds the first row containing `Account No`, `Account Name`, and `Denomination`, then imports only valid member rows. The `Select`, `Month Paid Upto`, and `Next RD Installment Due Date` columns are ignored.
+
 ## Email login requirements
 
 - Passwords must be at least 6 characters; longer passwords are recommended.
